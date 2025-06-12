@@ -1,0 +1,24 @@
+{
+  "name": "3D Printing Price Calculator",
+  "short_name": "3D Print Calc",
+  "description": "Professional 3D printing price calculator with PDF export",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#e0f7f1",
+  "theme_color": "#2c998e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

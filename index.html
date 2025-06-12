@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Printing Price Calculator</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Print Calc">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="theme-color" content="#2c998e">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #e0f7f1;
+      --bg-secondary: #fff;
+      --bg-section: #f7fdfb;
+      --bg-item: #f0fdfa;
+      --bg-totals: #fff9db;
+      --text-primary: #111;
+      --text-secondary: #444;
+      --text-accent: #2c998e;
+      --text-totals: #92400e;
+      --border-color: #ccc;
+      --border-totals: #fcd34d;
+      --button-primary: #38b2ac;
+      --button-primary-hover: #2c998e;
+      --button-secondary: #a78bfa;
+      --button-secondary-hover: #7c3aed;
+      --button-danger: #f56565;
+      --button-danger-hover: #e53e3e;
+      --shadow-light: rgba(0, 0, 0, 0.05);
+      --shadow-medium: rgba(0, 0, 0, 0.1);
+    }
+
+    [data-theme="dark"] {
+      --bg-primary: #1e1e1e;
+      --bg-secondary: #2c2c2c;
+      --bg-section: #333;
+      --bg-item: #3a3a3a;
+      --bg-totals: #4a3c1a;
+      --text-primary: #f1f1f1;
+      --text-secondary: #d1d1d1;
+      --text-accent: #4fd1c7;
+      --text-totals: #f6ad55;
+      --border-color: #555;
+      --border-totals: #d69e2e;
+      --shadow-light: rgba(255, 255, 255, 0.05);
+      --shadow-medium: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      margin: 0;
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      min-height: 100vh;
+    }
+
+    .calculator {
+      background-color: var(--bg-secondary);
+      border-radius: 2rem;
+      padding: 2rem;
+      width: fit-content;
+      min-width: 320px;
+      max-width: 480px;
+      box-shadow: 0 8px 24px var(--shadow-medium);
+      transition: background-color 0.3s ease;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+
+    .section {
+      background: var(--bg-section);
+      border-radius: 1.25rem;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 6px var(--shadow-light);
+      transition: background-color 0.3s ease;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text-accent);
+    }
+
+    .item-block {
+      background: var(--bg-item);
+      border-radius: 1rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 4px var(--shadow-light);
+      cursor: grab;
+      transition: all 0.2s ease;
+      user-select: none;
+      position: relative;
+    }
+
+    .item-block:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px var(--shadow-light);
+    }
+
+    .item-block.dragging {
+      opacity: 0.6;
+      transform: scale(0.98) rotate(2deg);
+      cursor: grabbing;
+    }
+
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .item-name {
+      font-size: 1rem;
+      border: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      padding: 0.5rem;
+      border-radius: 0.5rem;
+      flex: 1;
+      margin-right: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .collapse-btn {
+      background: none;
+      border: none;
+      color: var(--text-accent);
+      cursor: pointer;
+      font-size: 1.2rem;
+      padding: 0.25rem;
+      width: auto;
+      min-width: auto;
+      margin: 0;
+      transition: transform 0.2s ease;
+    }
+
+    .collapse-btn.collapsed {
+      transform: rotate(-90deg);
+    }
+
+    .item-content {
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      overflow: hidden;
+      max-height: 500px;
+      opacity: 1;
+    }
+
+    .item-content.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+
+    .input-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .input-row span {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .input-row input {
+      font-size: 1rem;
+      border: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      padding: 0.5rem;
+      border-radius: 0.5rem;
+      width: 6rem;
+      transition: all 0.2s ease;
+    }
+
+    .input-row input:focus {
+      outline: none;
+      border-color: var(--text-accent);
+      box-shadow: 0 0 0 2px rgba(44, 153, 142, 0.2);
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      padding: 0.9rem;
+      background-color: var(--button-primary);
+      color: white;
+      font-size: 1rem;
+      border: none;
+      border-radius: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    button:hover {
+      background-color: var(--button-primary-hover);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .button-group button {
+      flex: 1;
+    }
+
+    .reset-btn {
+      background-color: var(--button-secondary);
+    }
+
+    .reset-btn:hover {
+      background-color: var(--button-secondary-hover);
+    }
+
+    .remove-btn {
+      background-color: var(--button-danger);
+    }
+
+    .remove-btn:hover {
+      background-color: var(--button-danger-hover);
+    }
+
+    .preset-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .preset-card {
+      background-color: var(--bg-item);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      min-width: 45%;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .preset-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px var(--shadow-light);
+    }
+
+    .preset-card button {
+      margin: 0 0 0 0.5rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
+      min-width: auto;
+      width: auto;
+    }
+
+    .totals {
+      background: var(--bg-totals);
+      border: 2px solid var(--border-totals);
+      padding: 1rem;
+      border-radius: 1rem;
+      margin-top: 1rem;
+      transition: background-color 0.3s ease;
+    }
+
+    .totals .input-row span {
+      font-weight: 700;
+      color: var(--text-totals);
+    }
+
+    .dark-toggle {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      font-size: 1.5rem;
+      cursor: pointer;
+      z-index: 1000;
+      user-select: none;
+      background: var(--bg-secondary);
+      border-radius: 50%;
+      width: 3rem;
+      height: 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px var(--shadow-medium);
+      transition: all 0.3s ease;
+    }
+
+    .dark-toggle:hover {
+      transform: scale(1.1);
+    }
+
+    .notification {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--button-primary);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 1001;
+      pointer-events: none;
+    }
+
+    .notification.show {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    .summary {
+      background: var(--bg-item);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+    }
+
+          @media (max-width: 600px) {
+      body {
+        padding: 1rem;
+      }
+      
+      .calculator {
+        padding: 1.5rem;
+        width: 100%;
+        min-width: unset;
+      }
+      
+      .input-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+      
+      .input-row input {
+        width: 100%;
+      }
+
+      .button-group {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dark-toggle" onclick="App.theme.toggle()" title="Toggle Dark Mode" role="button" tabindex="0">🌙</div>
+  <div class="notification" id="notification"></div>
+  
+  <div class="calculator">
+    <h1>3D Printing Price Calculator</h1>
+    
+    <div class="section">
+      <div class="section-title">Items</div>
+      <div id="items" ondragover="App.dragDrop.onDragOver(event)" ondrop="App.dragDrop.onDrop(event)">
+        <div class="empty-state" id="emptyState">No items added yet. Click "Add Item" to get started.</div>
+      </div>
+      
+      <button onclick="App.items.add()">+ Add Item</button>
+      
+      <div class="button-group">
+        <button class="reset-btn" onclick="App.items.resetOrder()">Reset Order</button>
+        <button class="reset-btn" onclick="App.calculator.reset()">Reset All</button>
+      </div>
+      
+      <input 
+        id="presetName" 
+        placeholder="Enter preset name..." 
+        style="margin-top:0.75rem;padding:0.75rem;border-radius:1rem;border:1px solid var(--border-color);width:100%;background:var(--bg-secondary);color:var(--text-primary);" 
+      />
+      
+      <div class="button-group">
+        <button class="reset-btn" onclick="App.presets.save()">Save Preset</button>
+        <button class="reset-btn" onclick="App.presets.toggle()">View Presets</button>
+      </div>
+      
+      <div id="presetList" class="preset-container" style="display:none;"></div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">Global Settings</div>
+      <div class="input-row"><span>Profit Margin %</span><input id="profitMargin" type="number" value="20" min="0" step="0.1"></div>
+      <div class="input-row"><span>Labor $/hr</span><input id="laborRate" type="number" value="15" min="0" step="0.01"></div>
+      <div class="input-row"><span>Labor Hours</span><input id="laborHours" type="number" value="2" min="0" step="0.1"></div>
+      <div class="input-row"><span>Shipping ($)</span><input id="shipping" type="number" value="10" min="0" step="0.01"></div>
+      <div class="input-row"><span>Packaging ($)</span><input id="packaging" type="number" value="5" min="0" step="0.01"></div>
+      <div class="input-row"><span>Tax %</span><input id="tax" type="number" value="0" min="0" step="0.1"></div>
+      <div class="input-row"><span>Discount %</span><input id="discount" type="number" value="0" min="0" max="100" step="0.1"></div>
+      
+      <div id="summary" class="summary" style="display:none;">
+        <div class="summary-row"><span>Items Total:</span><span id="itemsTotal">$0.00</span></div>
+        <div class="summary-row"><span>Labor Cost:</span><span id="laborCost">$0.00</span></div>
+        <div class="summary-row"><span>Shipping & Packaging:</span><span id="shippingPackaging">$0.00</span></div>
+      </div>
+      
+      <button onclick="App.calculator.calculate()">Calculate Total</button>
+      <button class="reset-btn" onclick="App.exportPDF()">Export to PDF</button>
+      
+      <div class="totals">
+        <div class="input-row"><span>Subtotal (No Profit)</span><input id="totalNoProfit" readonly></div>
+        <div class="input-row"><span>Final Total</span><input id="totalWithProfit" readonly></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    // Main application object
+    const App = {
+      state: {
+        items: new Map(),
+        originalOrder: [],
+        presets: new Map(),
+        presetsVisible: false,
+        draggedElement: null,
+        autoCalc: true
+      },
+
+      // Cache DOM elements
+      elements: {},
+
+      // Initialize the application
+      init() {
+        this.cacheElements();
+        this.theme.init();
+        this.loadState();
+        this.attachEventListeners();
+        this.items.updateEmptyState();
+        
+        // Load default preset if exists
+        if (this.state.presets.has('default')) {
+          this.presets.load('default');
+        }
+      },
+
+      cacheElements() {
+        this.elements = {
+          itemsContainer: document.getElementById('items'),
+          emptyState: document.getElementById('emptyState'),
+          presetList: document.getElementById('presetList'),
+          notification: document.getElementById('notification'),
+          darkToggle: document.querySelector('.dark-toggle'),
+          presetName: document.getElementById('presetName'),
+          summary: document.getElementById('summary'),
+          // Cache global setting inputs
+          profitMargin: document.getElementById('profitMargin'),
+          laborRate: document.getElementById('laborRate'),
+          laborHours: document.getElementById('laborHours'),
+          shipping: document.getElementById('shipping'),
+          packaging: document.getElementById('packaging'),
+          tax: document.getElementById('tax'),
+          discount: document.getElementById('discount'),
+          totalNoProfit: document.getElementById('totalNoProfit'),
+          totalWithProfit: document.getElementById('totalWithProfit')
+        };
+      },
+
+      attachEventListeners() {
+        // Use event delegation for better performance
+        this.elements.itemsContainer.addEventListener('change', this.handleItemChange.bind(this));
+        this.elements.itemsContainer.addEventListener('click', this.handleItemClick.bind(this));
+        
+        // Global settings listeners
+        const globalInputs = ['profitMargin', 'laborRate', 'laborHours', 'shipping', 'packaging', 'tax', 'discount'];
+        globalInputs.forEach(id => {
+          this.elements[id].addEventListener('change', () => {
+            if (this.state.autoCalc) this.calculator.calculate();
+          });
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', this.handleKeyboard.bind(this));
+      },
+
+      handleItemChange(e) {
+        if (e.target.matches('input')) {
+          const itemBlock = e.target.closest('.item-block');
+          if (itemBlock) {
+            const itemId = itemBlock.dataset.id;
+            const field = e.target.dataset.field;
+            const value = field === 'name' ? e.target.value : parseFloat(e.target.value) || 0;
+            this.items.update(itemId, field, value);
+          }
+        }
+      },
+
+      handleItemClick(e) {
+        if (e.target.matches('.remove-btn')) {
+          const itemId = e.target.closest('.item-block').dataset.id;
+          this.items.remove(itemId);
+        } else if (e.target.matches('.collapse-btn')) {
+          this.items.toggleCollapse(e.target);
+        }
+      },
+
+      handleKeyboard(e) {
+        if (e.ctrlKey || e.metaKey) {
+          switch(e.key) {
+            case 'Enter':
+              e.preventDefault();
+              this.calculator.calculate();
+              break;
+            case 'n':
+              e.preventDefault();
+              this.items.add();
+              break;
+            case 's':
+              e.preventDefault();
+              this.presets.save();
+              break;
+          }
+        }
+      },
+
+      // Theme management
+      theme: {
+        init() {
+          const savedTheme = localStorage.getItem('3d-calc-theme') || 'light';
+          document.documentElement.setAttribute('data-theme', savedTheme);
+          App.elements.darkToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        },
+
+        toggle() {
+          const currentTheme = document.documentElement.getAttribute('data-theme');
+          const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', newTheme);
+          App.elements.darkToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+          localStorage.setItem('3d-calc-theme', newTheme);
+        }
+      },
+
+      // Item management
+      items: {
+        add(name = '', material = 0, hours = 0, minutes = 0, rate = 0, profit = 20) {
+          const id = 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+          const item = { id, name, material, hours, minutes, rate, profit };
+          App.state.items.set(id, item);
+          App.state.originalOrder.push(id);
+          
+          const div = this.createElement(item);
+          App.elements.itemsContainer.appendChild(div);
+          this.updateEmptyState();
+          
+          if (App.state.autoCalc) App.calculator.calculate();
+        },
+
+        createElement(item) {
+          const div = document.createElement('div');
+          div.className = 'item-block';
+          div.draggable = true;
+          div.dataset.id = item.id;
+          
+          div.innerHTML = `
+            <div class='item-header'>
+              <input type='text' class='item-name' value='${item.name}' 
+                data-field='name' placeholder='Item name...'>
+              <button class='collapse-btn' title='Collapse/Expand'>▼</button>
+            </div>
+            <div class='item-content'>
+              <div class='input-row'>
+                <span>Material Cost ($)</span>
+                <input type='number' value='${item.material}' min='0' step='0.01' data-field='material'>
+              </div>
+              <div class='input-row'>
+                <span>Print Time (hrs)</span>
+                <input type='number' value='${item.hours}' min='0' step='0.1' data-field='hours'>
+              </div>
+              <div class='input-row'>
+                <span>Print Time (mins)</span>
+                <input type='number' value='${item.minutes}' min='0' max='59' step='1' data-field='minutes'>
+              </div>
+              <div class='input-row'>
+                <span>Machine Cost ($/hr)</span>
+                <input type='number' value='${item.rate}' min='0' step='0.01' data-field='rate'>
+              </div>
+              <div class='input-row'>
+                <span>Item Profit %</span>
+                <input type='number' value='${item.profit}' min='0' step='0.1' data-field='profit'>
+              </div>
+              <button class='remove-btn'>Remove Item</button>
+            </div>
+          `;
+          
+          this.addDragListeners(div);
+          return div;
+        },
+
+        update(id, field, value) {
+          const item = App.state.items.get(id);
+          if (item) {
+            item[field] = value;
+            if (App.state.autoCalc) App.calculator.calculate();
+          }
+        },
+
+        remove(id) {
+          App.state.items.delete(id);
+          App.state.originalOrder = App.state.originalOrder.filter(itemId => itemId !== id);
+          const element = document.querySelector(`[data-id="${id}"]`);
+          if (element) element.remove();
+          this.updateEmptyState();
+          if (App.state.autoCalc) App.calculator.calculate();
+        },
+
+        toggleCollapse(button) {
+          const content = button.closest('.item-block').querySelector('.item-content');
+          button.classList.toggle('collapsed');
+          content.classList.toggle('collapsed');
+        },
+
+        updateEmptyState() {
+          App.elements.emptyState.style.display = App.state.items.size === 0 ? 'block' : 'none';
+        },
+
+        resetOrder() {
+          const items = Array.from(App.elements.itemsContainer.querySelectorAll('.item-block'));
+          items.sort((a, b) => {
+            return App.state.originalOrder.indexOf(a.dataset.id) - 
+                   App.state.originalOrder.indexOf(b.dataset.id);
+          });
+          
+          App.elements.itemsContainer.innerHTML = '';
+          if (App.state.items.size === 0) {
+            App.elements.itemsContainer.appendChild(App.elements.emptyState);
+          }
+          items.forEach(el => App.elements.itemsContainer.appendChild(el));
+          App.utils.showNotification('Item order reset');
+        },
+
+        addDragListeners(el) {
+          el.addEventListener('dragstart', (e) => {
+            el.classList.add('dragging');
+            App.state.draggedElement = el;
+            e.dataTransfer.effectAllowed = 'move';
+          });
+          
+          el.addEventListener('dragend', () => {
+            el.classList.remove('dragging');
+            App.state.draggedElement = null;
+          });
+        }
+      },
+
+      // Drag and drop
+      dragDrop: {
+        onDragOver(e) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        },
+
+        onDrop(e) {
+          e.preventDefault();
+          const dragging = App.state.draggedElement;
+          if (!dragging) return;
+
+          const afterElement = this.getDragAfterElement(App.elements.itemsContainer, e.clientY);
+          if (!afterElement) {
+            App.elements.itemsContainer.appendChild(dragging);
+          } else {
+            App.elements.itemsContainer.insertBefore(dragging, afterElement);
+          }
+        },
+
+        getDragAfterElement(container, y) {
+          const draggableElements = [...container.querySelectorAll('.item-block:not(.dragging)')];
+          return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            return (offset < 0 && offset > closest.offset) ? { offset, element: child } : closest;
+          }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+      },
+
+      // Calculator
+      calculator: {
+        calculate() {
+          let itemsTotal = 0;
+          
+          // Calculate items total
+          App.state.items.forEach(item => {
+            const cost = item.material;
+            const totalHours = item.hours + (item.minutes / 60);
+            const machineCost = totalHours * item.rate;
+            let subtotal = cost + machineCost;
+            subtotal *= (1 + item.profit / 100);
+            itemsTotal += subtotal;
+          });
+
+          // Get global values
+          const laborRate = parseFloat(App.elements.laborRate.value) || 0;
+          const laborHours = parseFloat(App.elements.laborHours.value) || 0;
+          const laborCost = laborRate * laborHours;
+          const shipping = parseFloat(App.elements.shipping.value) || 0;
+          const packaging = parseFloat(App.elements.packaging.value) || 0;
+          const globalProfit = parseFloat(App.elements.profitMargin.value) || 0;
+          const tax = parseFloat(App.elements.tax.value) || 0;
+          const discount = parseFloat(App.elements.discount.value) || 0;
+
+          // Update summary
+          document.getElementById('itemsTotal').textContent = '$' + itemsTotal.toFixed(2);
+          document.getElementById('laborCost').textContent = '$' + laborCost.toFixed(2);
+          document.getElementById('shippingPackaging').textContent = '$' + (shipping + packaging).toFixed(2);
+          App.elements.summary.style.display = 'block';
+
+          // Calculate totals
+          const baseTotal = itemsTotal + laborCost + shipping + packaging;
+          App.elements.totalNoProfit.value = '$' + baseTotal.toFixed(2);
+
+          let finalTotal = baseTotal * (1 + globalProfit / 100);
+          finalTotal = finalTotal * (1 + tax / 100) * (1 - discount / 100);
+          App.elements.totalWithProfit.value = '$' + finalTotal.toFixed(2);
+        },
+
+        reset() {
+          // Clear all items
+          App.state.items.clear();
+          App.state.originalOrder = [];
+          App.elements.itemsContainer.innerHTML = '';
+          App.elements.itemsContainer.appendChild(App.elements.emptyState);
+
+          // Reset global values
+          const defaults = {
+            profitMargin: 20, laborRate: 15, laborHours: 2, 
+            shipping: 10, packaging: 5, tax: 0, discount: 0
+          };
+          
+          Object.entries(defaults).forEach(([id, value]) => {
+            App.elements[id].value = value;
+          });
+
+          // Clear totals and hide summary
+          App.elements.totalNoProfit.value = '';
+          App.elements.totalWithProfit.value = '';
+          App.elements.summary.style.display = 'none';
+          
+          App.utils.showNotification('All values reset');
+        }
+      },
+
+      // Preset management
+      presets: {
+        save() {
+          const name = App.elements.presetName.value.trim();
+          if (!name) {
+            App.utils.showNotification('Please enter a preset name');
+            return;
+          }
+
+          const preset = {
+            items: Array.from(App.state.items.values()),
+            settings: {
+              profitMargin: App.elements.profitMargin.value,
+              laborRate: App.elements.laborRate.value,
+              laborHours: App.elements.laborHours.value,
+              shipping: App.elements.shipping.value,
+              packaging: App.elements.packaging.value,
+              tax: App.elements.tax.value,
+              discount: App.elements.discount.value
+            },
+            timestamp: Date.now()
+          };
+
+          App.state.presets.set(name, preset);
+          App.saveState();
+          App.elements.presetName.value = '';
+          this.render();
+          App.utils.showNotification(`Preset "${name}" saved`);
+        },
+
+        load(name) {
+          const preset = App.state.presets.get(name);
+          if (!preset) {
+            App.utils.showNotification('Preset not found');
+            return;
+          }
+
+          // Clear existing items
+          App.state.items.clear();
+          App.state.originalOrder = [];
+          App.elements.itemsContainer.innerHTML = '';
+
+          // Load items
+          preset.items.forEach(item => {
+            App.state.items.set(item.id, {...item});
+            App.state.originalOrder.push(item.id);
+            const div = App.items.createElement(item);
+            App.elements.itemsContainer.appendChild(div);
+          });
+
+          // Load settings
+          Object.entries(preset.settings).forEach(([key, value]) => {
+            if (App.elements[key]) App.elements[key].value = value;
+          });
+
+          App.items.updateEmptyState();
+          App.calculator.calculate();
+          App.utils.showNotification(`Preset "${name}" loaded`);
+        },
+
+        delete(name) {
+          if (confirm(`Delete preset "${name}"?`)) {
+            App.state.presets.delete(name);
+            App.saveState();
+            this.render();
+            App.utils.showNotification(`Preset "${name}" deleted`);
+          }
+        },
+
+        render() {
+          App.elements.presetList.innerHTML = '';
+          
+          if (App.state.presets.size === 0) {
+            App.elements.presetList.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-style:italic;">No saved presets</div>';
+            return;
+          }
+
+          App.state.presets.forEach((preset, name) => {
+            const div = document.createElement('div');
+            div.className = 'preset-card';
+            div.innerHTML = `
+              <span onclick="App.presets.load('${name}')" style="flex: 1; cursor: pointer;">${name}</span>
+              <button onclick="App.presets.delete('${name}')" class="remove-btn" style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.8rem; min-width: auto; width: auto;">×</button>
+            `;
+            App.elements.presetList.appendChild(div);
+          });
+        },
+
+        toggle() {
+          App.state.presetsVisible = !App.state.presetsVisible;
+          App.elements.presetList.style.display = App.state.presetsVisible ? 'flex' : 'none';
+          if (App.state.presetsVisible) this.render();
+        }
+      },
+
+      // Utilities
+      utils: {
+        showNotification(message, duration = 3000) {
+          const notification = App.elements.notification;
+          notification.textContent = message;
+          notification.classList.add('show');
+          setTimeout(() => notification.classList.remove('show'), duration);
+        },
+
+        debounce(func, wait) {
+          let timeout;
+          return function executedFunction(...args) {
+            const later = () => {
+              clearTimeout(timeout);
+              func.apply(this, args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+          };
+        }
+      },
+
+      // PDF Export
+      exportPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // Title
+        doc.setFontSize(20);
+        doc.text('3D Printing Price Quote', 105, 20, { align: 'center' });
+        
+        // Date
+        doc.setFontSize(10);
+        const date = new Date().toLocaleDateString();
+        doc.text(`Generated: ${date}`, 105, 30, { align: 'center' });
+        
+        let yPos = 45;
+        
+        // Items Section
+        if (App.state.items.size > 0) {
+          doc.setFontSize(14);
+          doc.setFont(undefined, 'bold');
+          doc.text('Items:', 20, yPos);
+          yPos += 10;
+          
+          doc.setFontSize(10);
+          doc.setFont(undefined, 'normal');
+          
+          let itemIndex = 1;
+          App.state.items.forEach(item => {
+            const name = item.name || `Item ${itemIndex}`;
+            const totalHours = item.hours + (item.minutes / 60);
+            const machineCost = totalHours * item.rate;
+            const itemTotal = (item.material + machineCost) * (1 + item.profit / 100);
+            
+            doc.text(`${itemIndex}. ${name}`, 25, yPos);
+            yPos += 6;
+            doc.text(`   Material: ${item.material.toFixed(2)}`, 30, yPos);
+            yPos += 5;
+            doc.text(`   Print Time: ${item.hours}h ${item.minutes}m`, 30, yPos);
+            yPos += 5;
+            doc.text(`   Machine Rate: ${item.rate.toFixed(2)}/hr`, 30, yPos);
+            yPos += 5;
+            doc.text(`   Item Profit: ${item.profit}%`, 30, yPos);
+            yPos += 5;
+            doc.text(`   Subtotal: ${itemTotal.toFixed(2)}`, 30, yPos);
+            yPos += 10;
+            
+            itemIndex++;
+            
+            // Check if we need a new page
+            if (yPos > 250) {
+              doc.addPage();
+              yPos = 20;
+            }
+          });
+        }
+        
+        // Global Settings
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text('Cost Breakdown:', 20, yPos);
+        yPos += 10;
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        
+        // Calculate totals for the PDF
+        let itemsTotal = 0;
+        App.state.items.forEach(item => {
+          const totalHours = item.hours + (item.minutes / 60);
+          const machineCost = totalHours * item.rate;
+          let subtotal = item.material + machineCost;
+          subtotal *= (1 + item.profit / 100);
+          itemsTotal += subtotal;
+        });
+        
+        const laborRate = parseFloat(App.elements.laborRate.value) || 0;
+        const laborHours = parseFloat(App.elements.laborHours.value) || 0;
+        const laborCost = laborRate * laborHours;
+        const shipping = parseFloat(App.elements.shipping.value) || 0;
+        const packaging = parseFloat(App.elements.packaging.value) || 0;
+        const globalProfit = parseFloat(App.elements.profitMargin.value) || 0;
+        const tax = parseFloat(App.elements.tax.value) || 0;
+        const discount = parseFloat(App.elements.discount.value) || 0;
+        
+        doc.text(`Items Total: ${itemsTotal.toFixed(2)}`, 25, yPos);
+        yPos += 6;
+        doc.text(`Labor: ${laborHours}h × ${laborRate}/hr = ${laborCost.toFixed(2)}`, 25, yPos);
+        yPos += 6;
+        doc.text(`Shipping: ${shipping.toFixed(2)}`, 25, yPos);
+        yPos += 6;
+        doc.text(`Packaging: ${packaging.toFixed(2)}`, 25, yPos);
+        yPos += 10;
+        
+        // Subtotal
+        const baseTotal = itemsTotal + laborCost + shipping + packaging;
+        doc.setFont(undefined, 'bold');
+        doc.text(`Subtotal (Before Profit): ${baseTotal.toFixed(2)}`, 25, yPos);
+        yPos += 10;
+        
+        // Final calculations
+        doc.setFont(undefined, 'normal');
+        doc.text(`Global Profit Margin: ${globalProfit}%`, 25, yPos);
+        yPos += 6;
+        
+        let finalTotal = baseTotal * (1 + globalProfit / 100);
+        
+        if (tax > 0) {
+          doc.text(`Tax: ${tax}%`, 25, yPos);
+          yPos += 6;
+        }
+        
+        if (discount > 0) {
+          doc.text(`Discount: ${discount}%`, 25, yPos);
+          yPos += 6;
+        }
+        
+        finalTotal = finalTotal * (1 + tax / 100) * (1 - discount / 100);
+        
+        yPos += 5;
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text(`FINAL TOTAL: ${finalTotal.toFixed(2)}`, 25, yPos);
+        
+        // Footer
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
+        doc.text('Generated by 3D Printing Price Calculator', 105, 280, { align: 'center' });
+        
+        // Save the PDF
+        const filename = `3D_Print_Quote_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(filename);
+        
+        App.utils.showNotification('PDF exported successfully!');
+      },
+
+      // State persistence
+      saveState() {
+        const presetsArray = Array.from(App.state.presets.entries());
+        localStorage.setItem('3d-calc-presets', JSON.stringify(presetsArray));
+      },
+
+      loadState() {
+        try {
+          const savedPresets = localStorage.getItem('3d-calc-presets');
+          if (savedPresets) {
+            const presetsArray = JSON.parse(savedPresets);
+            App.state.presets = new Map(presetsArray);
+          }
+        } catch (e) {
+          console.error('Failed to load saved presets:', e);
+        }
+      }
+    };
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => App.init());
+    } else {
+      App.init();
+    }
+
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(reg => console.log('Service Worker registered'))
+          .catch(err => console.log('Service Worker registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>
